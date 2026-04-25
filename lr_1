@@ -198,7 +198,6 @@ def get_data(session, start_date=None, end_date=None, timezone_offset="+04:00"):
             headers = {
                 "X-Requested-With": "XMLHttpRequest",
                 "Referer": index_url,
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             }
 
             print(f"\nВаше расписание с {start_date} по {end_date}")

@@ -344,9 +344,6 @@ def search_by_day(lessons, day):
 def search_by_subject(session, lessons, subject):
     for l in lessons:
         if subject.lower() in l["name"].lower():
-            print("Найдено:")
-            show_lesson(l)
-
             if l["url"]:
                 try:
                     r = session.get(l["url"], timeout=30)
@@ -355,7 +352,6 @@ def search_by_subject(session, lessons, subject):
                     table = soup.find("table")
 
                     if table:
-                        print("Подробности:")
                         for row in table.find_all("tr"):
                             th = row.find("th")
                             td = row.find("td")

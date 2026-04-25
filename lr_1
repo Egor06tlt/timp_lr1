@@ -1,0 +1,469 @@
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+import datetime
+import calendar
+import time
+
+base = "https://lk.samgtu.ru"
+login_url = "https://lk.samgtu.ru/site/login?login_url=%2Fdistancelearning%2Fdistancelearning%2Findex"
+index_url = "https://lk.samgtu.ru/distancelearning/distancelearning/index"
+api_url = "https://lk.samgtu.ru/api/common/distancelearning"
+
+def get_csrf(s):
+    r = s.get(login_url)
+    soup = BeautifulSoup(r.text, "html.parser")
+    token = soup.find("input", {"name": "_csrf"})
+    if token:
+        return token.get("value")
+    meta = soup.find("meta", {"name": "csrf-token"})
+    if meta:
+        return meta.get("content")
+    
+    return ""
+
+def login(s, username, password):
+    csrf = get_csrf(s)
+    data = {
+        "_csrf": csrf,
+        "LoginForm[username]": username,
+        "LoginForm[password]": password,
+        "LoginForm[rememberMe]": "0"
+    }
+    
+    s.post(login_url, data=data)
+    
+    r = s.get(index_url)
+    
+    if "loginform[username]" in r.text.lower():
+        return False
+    
+    return True
+
+def get_dates_for_month(year, month):
+    start = datetime.date(year, month, 1)
+    last_day = datetime.date(year, month, calendar.monthrange(year, month)[1])
+    end = last_day
+    
+    return start.isoformat(), end.isoformat()
+
+def get_dates_for_week(start_date):
+    start = start_date - datetime.timedelta(days=start_date.weekday())
+    end = start + datetime.timedelta(days=7)
+    
+    return start.isoformat(), end.isoformat()
+
+def get_dates_for_range(start_date, end_date):
+    return start_date.isoformat(), end_date.isoformat()
+
+def select_date_range():
+    print("\nВыберите период:")
+    print("1 - Выбрать расписание за текущий месяц")
+    print("2 - Выбрать расписание в конкретный месяц")
+    print("3 - Выбрать расписание в конкретную неделю")
+    print("4 - Выбрать самому диапазон расписания")
+    print("0 - Выход в главное меню")
+    
+    choice = input("Ваш выбор: ")
+    
+    today = datetime.date.today()
+    current_year = today.year
+    
+    if choice == "1":
+        return get_dates_for_month(today.year, today.month)
+    
+    elif choice == "2":
+        year = int(input("Введите год (например, 2026): "))
+        
+        if year > current_year:
+            print(f"\nОшибка: Год {year} больше текущего {current_year}. Возврат в главное меню.")
+            return None, None
+        
+        month = int(input("Введите месяц (1-12): "))
+        
+        if month < 1 or month > 12:
+            print("\nОшибка: Месяц должен быть от 1 до 12. Возврат в главное меню.")
+            return None, None
+        
+        return get_dates_for_month(year, month)
+    
+    elif choice == "3":
+        print("\nВведите любой день нужной недели:")
+        year = int(input("Год: "))
+        
+        if year > current_year:
+            print(f"\nОшибка: Год {year} больше текущего {current_year}. Возврат в главное меню.")
+            return None, None
+        
+        month = int(input("Месяц: "))
+        
+        if month < 1 or month > 12:
+            print("\nОшибка: Месяц должен быть от 1 до 12. Возврат в главное меню.")
+            return None, None
+        
+        day = int(input("День: "))
+
+        if day < 1 or day > 31:
+            print("\nОшибка: День должен быть от 1 до 31. Возврат в главное меню.")
+            return None, None
+        
+        try:
+            date = datetime.date(year, month, day)
+        except ValueError:
+            print("\nОшибка: Такой даты не существует. Возврат в главное меню.")
+            return None, None
+        
+        return get_dates_for_week(date)
+    
+    elif choice == "4":
+        print("\nВведите начальную дату:")
+        year1 = int(input("Год: "))
+        
+        if year1 > current_year:
+            print(f"\nОшибка: Год {year1} больше текущего {current_year}. Возврат в главное меню.")
+            return None, None
+        
+        month1 = int(input("Месяц: "))
+        
+        if month1 < 1 or month1 > 12:
+            print("\nОшибка: Месяц должен быть от 1 до 12. Возврат в главное меню.")
+            return None, None
+        
+        day1 = int(input("День: "))
+        
+        if day1 < 1 or day1 > 31:
+            print("\nОшибка: День должен быть от 1 до 31. Возврат в главное меню.")
+            return None, None
+        
+        try:
+            start_date = datetime.date(year1, month1, day1)
+        except ValueError:
+            print("\nОшибка: Такой даты не существует. Возврат в главное меню.")
+            return None, None
+        
+        print("\nВведите конечную дату:")
+        year2 = int(input("Год: "))
+        
+        if year2 > current_year:
+            print(f"\nОшибка: Год {year2} больше текущего {current_year}. Возврат в главное меню.")
+            return None, None
+        
+        month2 = int(input("Месяц: "))
+        
+        if month2 < 1 or month2 > 12:
+            print("\nОшибка: Месяц должен быть от 1 до 12. Возврат в главное меню.")
+            return None, None
+        
+        day2 = int(input("День: "))
+
+        if day2 < 1 or day2 > 31:
+            print("\nОшибка: День должен быть от 1 до 31. Возврат в главное меню.")
+            return None, None
+        
+        try:
+            end_date = datetime.date(year2, month2, day2)
+        except ValueError:
+            print("\nОшибка: Такой даты не существует. Возврат в главное меню.")
+            return None, None
+        
+        if start_date > end_date:
+            print("\nОшибка: Начальная дата не может быть позже конечной. Возврат в главное меню.")
+            return None, None
+        
+        return get_dates_for_range(start_date, end_date)
+    
+    elif choice == "0":
+        return None, None
+    
+    else:
+        print("Неверный выбор. Возврат в главное меню.")
+        return None, None
+
+def get_data(session, start_date=None, end_date=None, timezone_offset="+04:00"):
+    max_retries = 3
+    
+    if start_date is None or end_date is None:
+        start_date, end_date = select_date_range()
+        if start_date is None and end_date is None:
+            return None
+    
+    for attempt in range(max_retries):
+        try:
+            params = {
+                "start": start_date + "T00:00:00" + timezone_offset,
+                "end": end_date + "T00:00:00" + timezone_offset,
+                "timeZone": "local"
+            }
+
+            headers = {
+                "X-Requested-With": "XMLHttpRequest",
+                "Referer": index_url,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            }
+
+            print(f"\nВаше расписание с {start_date} по {end_date}")
+            r = session.get(api_url, params=params, headers=headers, timeout=30)
+            r.raise_for_status()
+            
+            data = r.json()
+
+            if isinstance(data, list):
+                return data
+
+            if isinstance(data, dict):
+                return data.get("events") or data.get("items") or data.get("data") or []
+
+            return []
+            
+        except (requests.exceptions.ChunkedEncodingError,
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout) as e:
+            print(f"Ошибка получения данных (попытка {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(2)
+            else:
+                print("Не удалось получить данные после нескольких попыток")
+                return []
+        except ValueError as e:
+            print(f"Ошибка парсинга JSON: {e}")
+            return []
+
+def format_datetime(text):
+    try:
+        d = datetime.datetime.fromisoformat(text)
+        return d.strftime("%d.%m.%Y %H:%M")
+    except:
+        return text
+
+def format_date_only(text):
+    try:
+        d = datetime.datetime.fromisoformat(text)
+        return d.strftime("%d.%m.%Y")
+    except:
+        return text.split()[0] if " " in text else text
+
+def format_time_only(text):
+    try:
+        d = datetime.datetime.fromisoformat(text)
+        return d.strftime("%H:%M")
+    except:
+        return text.split()[1] if " " in text and len(text.split()) > 1 else ""
+
+def parse_description(text):
+    if not text:
+        return "", "", "", ""
+
+    try:
+        soup = BeautifulSoup(text, "html.parser")
+        arr = [x.strip() for x in soup.stripped_strings]
+
+        teacher = arr[1] if len(arr) > 1 else ""
+        vid = arr[2] if len(arr) > 2 else ""
+        time = arr[0] if len(arr) > 0 else ""
+        group = arr[3] if len(arr) > 3 else ""
+
+        return teacher, vid, time, group
+    except:
+        return "", "", "", ""
+
+def make_lessons(data):
+    result = []
+
+    for x in data:
+        if isinstance(x, dict):
+            teacher, vid, time, group = parse_description(x.get("description", ""))
+
+            result.append({
+                "name": x.get("title", ""),
+                "datetime": format_datetime(x.get("start", "")),  
+                "date": format_date_only(x.get("start", "")),   
+                "time": format_time_only(x.get("start", "")),    
+                "url": urljoin(base, x.get("url", "")),
+                "teacher": teacher,
+                "vid": vid,
+                "group": group
+            })
+
+    return result
+
+def show_all_lessons(lessons):
+    if not lessons:
+        print("Нет занятий за выбранный вами период, попробуйте заново")
+        return
+    
+    lessons_by_date = {}
+    for l in lessons:
+        date = l["date"]  
+        if date not in lessons_by_date:
+            lessons_by_date[date] = []
+        lessons_by_date[date].append(l)
+    
+    sorted_dates = sorted(lessons_by_date.keys())
+    
+    for date in sorted_dates:
+        print(f"\n{date}")
+        
+        day_lessons = sorted(lessons_by_date[date], key=lambda x: x["time"])  
+        
+        for l in day_lessons:
+            if l["name"]:
+                print(f"  Дисциплина: {l['name']}")
+            if l["time"]:
+                print(f"  Время: {l['time']}")
+            if l["teacher"]:
+                print(f"  Преподаватель: {l['teacher']}")
+            if l["vid"]:
+                print(f"  Вид занятия: {l['vid']}")
+            if l["group"]:
+                print(f"  Группы: {l['group']}")
+            print()
+
+def show_lesson(l):
+    if l["name"]:
+        print(f"Дисциплина: {l['name']}")
+    if l["date"]:
+        print(f"Дата: {l['date']}")
+    if l["time"]:
+        print(f"Время: {l['time']}")
+    if l["teacher"]:
+        print("Преподаватель:", l["teacher"])
+    if l["vid"]:
+        print("Вид занятия:", l["vid"])
+    if l["group"]:
+        print("Группа:", l["group"])
+    print()
+
+def search_by_day(lessons, day):
+    found = False
+    for l in lessons:
+        if day in l["date"]:  
+            show_lesson(l)
+            found = True
+    if not found:
+        print("Ничего не найдено, попробуйте заново\n")
+
+def search_by_subject(session, lessons, subject):
+    for l in lessons:
+        if subject.lower() in l["name"].lower():
+            print("Найдено:")
+            show_lesson(l)
+
+            if l["url"]:
+                try:
+                    r = session.get(l["url"], timeout=30)
+                    soup = BeautifulSoup(r.text, "html.parser")
+
+                    table = soup.find("table")
+
+                    if table:
+                        print("Подробности:")
+                        for row in table.find_all("tr"):
+                            th = row.find("th")
+                            td = row.find("td")
+
+                            if th and td:
+                                print(th.text.strip() + ":", td.text.strip())
+                    print()
+                except Exception as e:
+                    print(f"Ошибка при получении подробностей: {e}\n")
+
+            return
+
+    print("Ничего не найдено, попробуйте заново\n")
+
+def search_by_teacher(lessons, teacher):
+    subjects = []
+    found = False
+
+    for l in lessons:
+        if teacher.lower() in l["teacher"].lower():
+            show_lesson(l)
+            found = True
+
+            if l["name"] not in subjects:
+                subjects.append(l["name"])
+
+    if not found:
+        print("Ничего не найдено, попробуйте заново\n")
+        return
+
+    print("Предметы:")
+    for s in subjects:
+        print("-", s)
+    print()
+
+
+
+def main():
+    print("Вход в личный кабинет СамГТУ")
+
+    username = input("Логин: ")
+    password = input("Пароль: ")
+
+    session = requests.Session()
+    
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    })
+
+    if not login(session, username, password):
+        print("Попробуйте заново")
+        return
+
+    print("Вход выполнен")
+    
+    lessons = []
+    
+    while True:
+        print("Главное меню")
+        print("1 - Выбрать диапазон расписания")
+        print("2 - Поиск расписания по дню")
+        print("3 - Поиск расписания по предмету")
+        print("4 - Поиск расписания по преподавателю")
+        print("0 - Выход из личного кабинета СамГТУ")
+        
+        main_choice = input("\nВыбор: ")
+        
+        if main_choice == "1":
+            data = get_data(session)
+            if data is None:
+                continue
+            if not data:
+                print("Нет занятий за выбранный вами период")
+                continue
+            lessons = make_lessons(data)
+            if lessons:
+                show_all_lessons(lessons)  
+            else:
+                print("Нет занятий за выбранный вами период")
+        
+        elif main_choice == "2":
+            if not lessons:
+                print("Сначала выберите диапазон расписания (пункт 1)")
+                continue
+            day = input("Дата (например 01.01.2026): ")
+            search_by_day(lessons, day)
+        
+        elif main_choice == "3":
+            if not lessons:
+                print("Сначала выберите диапазон расписания (пункт 1)")
+                continue
+            subject = input("Предмет: ")
+            search_by_subject(session, lessons, subject)
+        
+        elif main_choice == "4":
+            if not lessons:
+                print("Сначала выберите диапазон расписания (пункт 1)")
+                continue
+            teacher = input("Преподаватель: ")
+            search_by_teacher(lessons, teacher)
+        
+        elif main_choice == "0":
+            print("Вы вышли из своего личного кабинета СамГТУ")
+            break
+        
+        else:
+            print("Неверный выбор, попробуйте заново")
+
+if __name__ == "__main__":
+    main()
